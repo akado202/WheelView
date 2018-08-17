@@ -1,11 +1,11 @@
 package com.akado.wheelview.sample;
 
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 
 import com.akado.wheelview.WheelView;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements WheelView.OnItemSelectListener {
 
     WheelView wheelView;
 
@@ -41,6 +41,16 @@ public class MainActivity extends AppCompatActivity {
 
         wheelView = findViewById(R.id.wheelView);
         wheelView.setAdapter(new WheelViewAdapter());
+    }
+
+    @Override
+    public void onItemScrolled(int position) {
+        
+    }
+
+    @Override
+    public void onItemSelected(int position) {
+
     }
 
     class WheelViewAdapter implements WheelView.Adapter {

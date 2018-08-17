@@ -38,7 +38,7 @@ public class WheelView extends View {
 
     private static final float VELOCITY_FLING_RATIO = 0.01f;
 
-    private static final int VELOCITY_FLING_DURATION = 20;
+    private static final int VELOCITY_FLING_DURATION = 50;
 
     private static final float VELOCITY_INTERPOLATOR_FACTOR = 5f;
 
@@ -53,6 +53,8 @@ public class WheelView extends View {
     }
 
     public interface OnItemSelectListener {
+        void onItemScrolled(int position);
+
         void onItemSelected(int position);
     }
 
@@ -177,7 +179,7 @@ public class WheelView extends View {
 //            Log.v(TAG, "\t>> measuredWidth : " + measuredWidth);
 //            Log.v(TAG, "\t>> measuredHeight : " + measuredHeight);
 
-            int itemsVisible = (int) (measuredHeight / itemHeight);
+            int itemsVisible = measuredHeight / itemHeight;
             itemsVisible += itemsVisible % 2 == 0 ? 1 : 2;
 //            Log.v(TAG, "\t>> itemsVisible : " + itemsVisible);
 
@@ -207,6 +209,8 @@ public class WheelView extends View {
             return;
         }
 
+        int savePreCurrentIndex = preCurrentIndex;
+
         initPosition = Math.min(Math.max(0, initPosition), adapter.getItemsCount() - 1);
         preCurrentIndex = initPosition + ((int) (totalScrollY / itemHeight) % adapter.getItemsCount());
         if (preCurrentIndex < 0) {
@@ -214,6 +218,10 @@ public class WheelView extends View {
         }
         if (preCurrentIndex > adapter.getItemsCount() - 1) {
             preCurrentIndex = adapter.getItemsCount() - 1;
+        }
+
+        if (onItemSelectListener != null && savePreCurrentIndex != preCurrentIndex) {
+            onItemSelectListener.onItemScrolled(preCurrentIndex);
         }
 
         int itemsVisible = visibles.length;
@@ -326,12 +334,19 @@ public class WheelView extends View {
                         float y = event.getY();
                         float offset = getDangleOffset(totalScrollY);
                         float clickOffset = 0f;
+
                         if (y < firstLineY) {
                             clickOffset = -itemHeight * ((int) ((firstLineY - y) / itemHeight) + 1);
                         } else if (y > secondLineY) {
                             clickOffset = itemHeight * ((int) ((y - secondLineY) / itemHeight) + 1);
                         }
-                        scrollBy(clickOffset + offset);
+
+                        float dest = totalScrollY + clickOffset + offset;
+                        if (dest >= top && dest <= bottom) {
+                            scrollBy(clickOffset + offset);
+                        } else {
+                            scrollBy(offset);
+                        }
                     }
                 }
         }
@@ -385,7 +400,7 @@ public class WheelView extends View {
         cancelObjectAnimator();
 
         long duration = (long) (Math.min(Math.abs(offset / itemHeight), 1f) * ANIMATION_DURATION);
-        ObjectAnimator objectAnimator = ObjectAnimator.ofFloat(this, "totalScrollY", totalScrollY, totalScrollY + offset);
+        objectAnimator = ObjectAnimator.ofFloat(this, "totalScrollY", totalScrollY, totalScrollY + offset);
         objectAnimator.setDuration(duration);
         objectAnimator.addListener(animatorListenerAdapter);
         objectAnimator.start();
@@ -413,7 +428,11 @@ public class WheelView extends View {
             dest -= (value * VELOCITY_FLING_RATIO);
             duration += VELOCITY_FLING_DURATION;
 
-            if (dest <= top || dest >= bottom) {
+            if (dest <= top) {
+                dest = top;
+                break;
+            } else if (dest >= bottom) {
+                dest = bottom;
                 break;
             }
 
@@ -426,25 +445,21 @@ public class WheelView extends View {
 
         dest = dest + getDangleOffset(dest);
 
-        ObjectAnimator objectAnimator = ObjectAnimator.ofFloat(this, "totalScrollY", totalScrollY, dest);
+        objectAnimator = ObjectAnimator.ofFloat(this, "totalScrollY", totalScrollY, dest);
         objectAnimator.setDuration(duration);
         objectAnimator.setInterpolator(new DecelerateInterpolator(VELOCITY_INTERPOLATOR_FACTOR));
         objectAnimator.addListener(animatorListenerAdapter);
         objectAnimator.start();
     }
 
-    private void onItemSelected() {
-        int position = getCurrentPosition();
-        Log.d(TAG, "onItemSelected: " + position);
-        if (onItemSelectListener != null) {
-            onItemSelectListener.onItemSelected(position);
-        }
-    }
-
     private AnimatorListenerAdapter animatorListenerAdapter = new AnimatorListenerAdapter() {
         @Override
         public void onAnimationEnd(Animator animation) {
-            onItemSelected();
+            int position = getCurrentPosition();
+            Log.d(TAG, "onItemSelected: " + position);
+            if (onItemSelectListener != null) {
+                onItemSelectListener.onItemSelected(position);
+            }
         }
     };
 
@@ -473,6 +488,10 @@ public class WheelView extends View {
     }
 
     public void setCurrentPosition(int position) {
+        setCurrentPosition(position, true);
+    }
+
+    public void setCurrentPosition(int position, boolean animate) {
         if (getAdapter() == null) {
             return;
         }
@@ -487,6 +506,11 @@ public class WheelView extends View {
         cancelObjectAnimator();
 
         float dest = getTopScrollY() + (itemHeight * position);
-        scrollBy(dest - totalScrollY);
+        if (animate) {
+            scrollBy(dest - totalScrollY);
+        } else {
+            totalScrollY = dest;
+            invalidate();
+        }
     }
 }
